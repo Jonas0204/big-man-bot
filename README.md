@@ -36,6 +36,22 @@ npm run register
 npm start
 ```
 
+## Docker (ohne Portfreigabe)
+
+Der Bot nutzt die Discord Gateway-Verbindung nach außen und benötigt **keinen eingehenden Port**.
+
+1. Image bauen:
+
+```bash
+docker build -t big-man-bot .
+```
+
+2. Container starten:
+
+```bash
+docker run -d --name big-man-bot --env-file .env big-man-bot
+```
+
 ## Umgebungsvariablen
 
 - `DISCORD_TOKEN`
