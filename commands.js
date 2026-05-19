@@ -1,49 +1,32 @@
 import 'dotenv/config';
-import { getRPSChoices } from './game.js';
-import { capitalize, InstallGlobalCommands } from './utils.js';
+import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 
-// Get the game choices from game.js
-function createCommandChoices() {
-  const choices = getRPSChoices();
-  const commandChoices = [];
+const REQUIRED_ENV_VARS = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID'];
 
-  for (let choice of choices) {
-    commandChoices.push({
-      name: capitalize(choice),
-      value: choice.toLowerCase(),
-    });
+for (const envVar of REQUIRED_ENV_VARS) {
+  if (!process.env[envVar]) {
+    throw new Error(`Fehlende Umgebungsvariable: ${envVar}`);
   }
-
-  return commandChoices;
 }
 
-// Simple test command
-const TEST_COMMAND = {
-  name: 'test',
-  description: 'Basic command',
-  type: 1,
-  integration_types: [0, 1],
-  contexts: [0, 1, 2],
-};
+const commands = [
+  new SlashCommandBuilder()
+    .setName('split-team')
+    .setDescription('Teilt alle Mitglieder deines aktuellen Voice-Channels zufällig in zwei Teams auf.')
+    .toJSON(),
+];
 
-// Command containing options
-const CHALLENGE_COMMAND = {
-  name: 'challenge',
-  description: 'Challenge to a match of rock paper scissors',
-  options: [
-    {
-      type: 3,
-      name: 'object',
-      description: 'Pick your object',
-      required: true,
-      choices: createCommandChoices(),
-    },
-  ],
-  type: 1,
-  integration_types: [0, 1],
-  contexts: [0, 2],
-};
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-const ALL_COMMANDS = [TEST_COMMAND, CHALLENGE_COMMAND];
+async function registerGuildCommands() {
+  await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), {
+    body: commands,
+  });
 
-InstallGlobalCommands(process.env.APP_ID, ALL_COMMANDS);
+  console.log('Slash-Commands erfolgreich als Guild-Commands registriert.');
+}
+
+registerGuildCommands().catch((error) => {
+  console.error('Fehler bei der Command-Registrierung:', error);
+  process.exit(1);
+});
