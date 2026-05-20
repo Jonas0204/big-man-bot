@@ -1,0 +1,10 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: big-man-bot:local
+    container_name: big-man-bot
+    env_file:
+      - .env
+    restart: unless-stopped

@@ -1,108 +1,78 @@
-# Getting Started app for Discord
+# big-man-bot
 
-This project contains a basic rock-paper-scissors-style Discord app written in JavaScript, built for the [getting started guide](https://discord.com/developers/docs/getting-started).
+Ein schlanker Discord.js Gateway-Bot mit den Slash-Commands `/split-team`, `/restore-team` und `/help`.
 
-![Demo of app](https://github.com/discord/discord-example-app/raw/main/assets/getting-started-demo.gif?raw=true)
+## Funktion
 
-## Project structure
-Below is a basic overview of the project structure:
+- `/split-team` teilt alle echten Nutzer aus deinem aktuellen Voice-Channel zufällig in zwei Teams auf und verschiebt sie in zwei bestehende Voice-Channels.
+- `/restore-team` verschiebt alle Mitglieder aus Team 1 und Team 2 zurück in den Ursprungskanal.
+- `/help` zeigt eine Übersicht aller verfügbaren Bot-Befehle.
 
-```
-├── examples    -> short, feature-specific sample apps
-│   ├── app.js  -> finished app.js code
-│   ├── button.js
-│   ├── command.js
-│   ├── modal.js
-│   ├── selectMenu.js
-├── .env.sample -> sample .env file
-├── app.js      -> main entrypoint for app
-├── commands.js -> slash command payloads + helpers
-├── game.js     -> logic specific to RPS
-├── utils.js    -> utility functions and enums
-├── package.json
-├── README.md
-└── .gitignore
-```
+## Voraussetzungen
 
-## Running app locally
+- Node.js 18+
+- Ein Discord-Bot mit mindestens diesen Rechten:
+  - View Channels
+  - Connect
+  - Move Members
 
-Before you start, you'll need to install [NodeJS](https://nodejs.org/en/download/) and [create a Discord app](https://discord.com/developers/applications) with the proper permissions:
-- `applications.commands`
-- `bot` (with Send Messages enabled)
+## Einrichtung
 
+1. Abhängigkeiten installieren:
 
-Configuring the app is covered in detail in the [getting started guide](https://discord.com/developers/docs/getting-started).
-
-### Setup project
-
-First clone the project:
-```
-git clone https://github.com/discord/discord-example-app.git
-```
-
-Then navigate to its directory and install dependencies:
-```
-cd discord-example-app
+```bash
 npm install
 ```
-### Get app credentials
 
-Fetch the credentials from your app's settings and add them to a `.env` file (see `.env.sample` for an example). You'll need your app ID (`APP_ID`), bot token (`DISCORD_TOKEN`), and public key (`PUBLIC_KEY`).
+2. `.env` aus `.env.example` erstellen und Werte eintragen.
 
-Fetching credentials is covered in detail in the [getting started guide](https://discord.com/developers/docs/getting-started).
+3. Slash-Command registrieren:
 
-> 🔑 Environment variables can be added to the `.env` file in Glitch or when developing locally, and in the Secrets tab in Replit (the lock icon on the left).
-
-### Install slash commands
-
-The commands for the example app are set up in `commands.js`. All of the commands in the `ALL_COMMANDS` array at the bottom of `commands.js` will be installed when you run the `register` command configured in `package.json`:
-
-```
+```bash
 npm run register
 ```
 
-### Run the app
+Wenn `GUILD_ID` gesetzt ist, wird als Guild-Command registriert (schnell für Entwicklung).
+Wenn `GUILD_ID` fehlt, wird global registriert (für alle Server der App).
 
-After your credentials are added, go ahead and run the app:
+4. Bot starten:
 
-```
-node app.js
-```
-
-> ⚙️ A package [like `nodemon`](https://github.com/remy/nodemon), which watches for local changes and restarts your app, may be helpful while locally developing.
-
-If you aren't following the [getting started guide](https://discord.com/developers/docs/getting-started), you can move the contents of `examples/app.js` (the finished `app.js` file) to the top-level `app.js`.
-
-### Set up interactivity
-
-The project needs a public endpoint where Discord can send requests. To develop and test locally, you can use something like [`ngrok`](https://ngrok.com/) to tunnel HTTP traffic.
-
-Install ngrok if you haven't already, then start listening on port `3000`:
-
-```
-ngrok http 3000
+```bash
+npm start
 ```
 
-You should see your connection open:
+## Docker (ohne Portfreigabe)
 
-```
-Tunnel Status                 online
-Version                       2.0/2.0
-Web Interface                 http://127.0.0.1:4040
-Forwarding                    https://1234-someurl.ngrok.io -> localhost:3000
+Der Bot nutzt die Discord Gateway-Verbindung nach außen und benötigt **keinen eingehenden Port**.
 
-Connections                  ttl     opn     rt1     rt5     p50     p90
-                              0       0       0.00    0.00    0.00    0.00
+1. Image bauen:
+
+```bash
+docker build -t big-man-bot .
 ```
 
-Copy the forwarding address that starts with `https`, in this case `https://1234-someurl.ngrok.io`, then go to your [app's settings](https://discord.com/developers/applications).
+2. Container starten:
 
-On the **General Information** tab, there will be an **Interactions Endpoint URL**. Paste your ngrok address there, and append `/interactions` to it (`https://1234-someurl.ngrok.io/interactions` in the example).
+```bash
+docker run -d --name big-man-bot --env-file .env big-man-bot
+```
 
-Click **Save Changes**, and your app should be ready to run 🚀
+Alternativ mit Docker Compose lokal bauen und starten:
 
-## Other resources
-- Read **[the documentation](https://discord.com/developers/docs/intro)** for in-depth information about API features.
-- Browse the `examples/` folder in this project for smaller, feature-specific code examples
-- Join the **[Discord Developers server](https://discord.gg/discord-developers)** to ask questions about the API, attend events hosted by the Discord API team, and interact with other devs.
-- Check out **[community resources](https://discord.com/developers/docs/topics/community-resources#community-resources)** for language-specific tools maintained by community members.
+```bash
+docker compose up -d --build
+```
+
+## Umgebungsvariablen
+
+- `DISCORD_TOKEN`
+- `APP_ID` oder `CLIENT_ID`
+- `GUILD_ID` (optional für Development-Registrierung)
+- `TEAM_1_CHANNEL_ID` und `TEAM_2_CHANNEL_ID` (globale Fallbacks)
+- `ORIGINAL_CHANNEL_ID` (Zielkanal für `/restore-team`)
+
+Optional pro Server (für Multi-Server-Betrieb):
+
+- `TEAM_1_CHANNEL_ID_<GUILD_ID>`
+- `TEAM_2_CHANNEL_ID_<GUILD_ID>`
+- `ORIGINAL_CHANNEL_ID_<GUILD_ID>`
