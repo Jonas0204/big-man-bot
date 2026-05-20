@@ -4,6 +4,7 @@ Ein schlanker Discord.js Gateway-Bot mit serverabhängiger Team-Konfiguration un
 
 ## Funktion
 
+- `/help` zeigt eine Übersicht aller verfügbaren Befehle.
 - `/configure` setzt Team 1 und Team 2 für den aktuellen Server.
 - `/set-team1` setzt nur den Team-1-Voice-Channel für den aktuellen Server.
 - `/set-team2` setzt nur den Team-2-Voice-Channel für den aktuellen Server.
@@ -77,3 +78,5 @@ docker compose up -d --build
 
 - Team-Channels werden pro Server in `data/team-config.json` gespeichert.
 - Der Bot legt den `data`-Ordner und die Datei automatisch an, falls sie fehlen.
+- Änderungen erfolgen immer für die aktuelle `interaction.guildId`; es gibt keinen Command-Parameter, um fremde Guild-IDs zu überschreiben.
+- Optional konfigurierte `OWNER_USER_IDS` sind globale Bot-Owner und dürfen absichtlich serverübergreifend Konfigurations-Commands nutzen.

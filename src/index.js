@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { handleSplitTeamInteraction, splitTeamCommand } from './commands/split-team.js';
+import { handleHelpInteraction, helpCommand } from './commands/help.js';
 import {
   configureCommand,
   handleConfigureInteraction,
@@ -37,6 +38,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === splitTeamCommand.name) {
     await handleSplitTeamInteraction(interaction);
+    return;
+  }
+
+  if (interaction.commandName === helpCommand.name) {
+    await handleHelpInteraction(interaction);
     return;
   }
 

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,7 +25,10 @@ async function readConfig() {
   try {
     const rawContent = await readFile(configFilePath, 'utf8');
     const parsed = JSON.parse(rawContent || '{}');
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
   } catch (error) {
     if (error instanceof SyntaxError) {
       return {};
@@ -36,42 +39,72 @@ async function readConfig() {
 
 async function writeConfig(config) {
   await ensureConfigFile();
-  await writeFile(configFilePath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  const temporaryConfigFilePath = `${configFilePath}.tmp`;
+  await writeFile(temporaryConfigFilePath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+  await rename(temporaryConfigFilePath, configFilePath);
+}
+
+function isValidSnowflake(value) {
+  return typeof value === 'string' && /^\d{17,20}$/.test(value);
+}
+
+function normalizeGuildConfig(guildConfig) {
+  if (typeof guildConfig !== 'object' || guildConfig === null) {
+    return null;
+  }
+
+  const normalized = {};
+  if (isValidSnowflake(guildConfig.team1ChannelId)) {
+    normalized.team1ChannelId = guildConfig.team1ChannelId;
+  }
+  if (isValidSnowflake(guildConfig.team2ChannelId)) {
+    normalized.team2ChannelId = guildConfig.team2ChannelId;
+  }
+  return normalized;
 }
 
 export async function getGuildTeamConfig(guildId) {
-  if (!guildId) {
+  if (!isValidSnowflake(guildId)) {
     return null;
   }
 
   const config = await readConfig();
-  return config[guildId] ?? null;
+  return normalizeGuildConfig(config[guildId]);
 }
 
 export async function setGuildTeamConfig(guildId, guildConfig) {
-  if (!guildId) {
+  if (!isValidSnowflake(guildId)) {
+    return;
+  }
+
+  const normalizedGuildConfig = normalizeGuildConfig(guildConfig);
+  if (!normalizedGuildConfig || Object.keys(normalizedGuildConfig).length === 0) {
     return;
   }
 
   const config = await readConfig();
-  config[guildId] = guildConfig;
+  config[guildId] = normalizedGuildConfig;
   await writeConfig(config);
 }
 
 export async function updateGuildTeamConfig(guildId, partialConfig) {
-  if (!guildId) {
+  if (!isValidSnowflake(guildId)) {
     return;
   }
 
   const currentGuildConfig = (await getGuildTeamConfig(guildId)) ?? {};
-  await setGuildTeamConfig(guildId, {
+  const mergedConfig = normalizeGuildConfig({
     ...currentGuildConfig,
     ...partialConfig,
   });
+  if (!mergedConfig || Object.keys(mergedConfig).length === 0) {
+    return;
+  }
+  await setGuildTeamConfig(guildId, mergedConfig);
 }
 
 export async function deleteGuildTeamConfig(guildId) {
-  if (!guildId) {
+  if (!isValidSnowflake(guildId)) {
     return;
   }
 

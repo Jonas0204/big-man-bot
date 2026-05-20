@@ -83,15 +83,15 @@ async function ensureGuildInteraction(interaction) {
 }
 
 async function getRequestingMember(interaction) {
-  if (interaction.member?.permissions) {
-    return interaction.member;
-  }
-
   return interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 }
 
 async function hasConfigPermission(interaction) {
   if (ownerUserIds.has(interaction.user.id)) {
+    return true;
+  }
+
+  if (interaction.user.id === interaction.guild.ownerId) {
     return true;
   }
 
