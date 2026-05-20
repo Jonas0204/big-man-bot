@@ -5,6 +5,8 @@ Ein schlanker Discord.js Gateway-Bot mit den Slash-Commands `/split-team`, `/res
 ## Funktion
 
 - `/split-team` teilt alle echten Nutzer aus deinem aktuellen Voice-Channel zufällig in zwei Teams auf und verschiebt sie in zwei bestehende Voice-Channels.
+  - Optional kann `/split-team` per Env auf Admins oder den Server-Owner eingeschränkt werden.
+  - Optionaler Testmodus erlaubt eine Vorschau mit nur einem Nutzer (ohne Verschieben).
 - `/restore-team` verschiebt alle Mitglieder aus Team 1 und Team 2 zurück in den Ursprungskanal.
 - `/help` zeigt eine Übersicht aller verfügbaren Bot-Befehle.
 
@@ -70,6 +72,9 @@ docker compose up -d --build
 - `GUILD_ID` (optional für Development-Registrierung)
 - `TEAM_1_CHANNEL_ID` und `TEAM_2_CHANNEL_ID` (globale Fallbacks)
 - `ORIGINAL_CHANNEL_ID` (Zielkanal für `/restore-team`)
+- `SPLIT_TEAM_ADMIN_ONLY` (optional: `true` = nur Admins dürfen `/split-team` nutzen)
+- `SPLIT_TEAM_OWNER_ONLY` (optional: `true` = nur Server-Owner darf `/split-team` nutzen)
+- `SPLIT_TEAM_TEST_MODE` (optional: `true` = `/split-team` funktioniert mit 1 Nutzer als Vorschau ohne Move)
 
 Optional pro Server (für Multi-Server-Betrieb):
 

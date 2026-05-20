@@ -1,4 +1,9 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import {
+  ChannelType,
+  MessageFlags,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from 'discord.js';
 
 export const restoreTeamCommand = new SlashCommandBuilder()
   .setName('restore-team')
@@ -70,7 +75,7 @@ export async function handleRestoreTeamInteraction(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
       content: 'Dieser Command kann nur auf einem Server genutzt werden.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -80,7 +85,7 @@ export async function handleRestoreTeamInteraction(interaction) {
   if (missingVars.length > 0) {
     await interaction.reply({
       content: `Es fehlen Umgebungsvariablen: ${missingVars.join(', ')}`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -93,7 +98,7 @@ export async function handleRestoreTeamInteraction(interaction) {
     await interaction.reply({
       content:
         'Die konfigurierten Voice-Channels sind ungültig. Bitte prüfe TEAM_1_CHANNEL_ID, TEAM_2_CHANNEL_ID und ORIGINAL_CHANNEL_ID.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -102,7 +107,7 @@ export async function handleRestoreTeamInteraction(interaction) {
   if (!botMember) {
     await interaction.reply({
       content: 'Bot-Mitglied konnte nicht geladen werden.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -117,7 +122,7 @@ export async function handleRestoreTeamInteraction(interaction) {
     await interaction.reply({
       content:
         'Mir fehlen Berechtigungen zum Verschieben von Mitgliedern. Ich brauche mindestens: View Channels, Connect, Move Members.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -133,7 +138,7 @@ export async function handleRestoreTeamInteraction(interaction) {
   if (membersToMove.length === 0) {
     await interaction.reply({
       content: 'In Team 1 und Team 2 sind aktuell keine Mitglieder zum Zurückverschieben.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

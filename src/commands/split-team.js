@@ -1,4 +1,9 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import {
+  ChannelType,
+  MessageFlags,
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+} from 'discord.js';
 
 export const splitTeamCommand = new SlashCommandBuilder()
   .setName('split-team')
@@ -40,6 +45,10 @@ function getTeamChannelId(guildId, teamNumber) {
   return process.env[`TEAM_${teamNumber}_CHANNEL_ID_${guildId}`] ?? process.env[`TEAM_${teamNumber}_CHANNEL_ID`];
 }
 
+function isTruthyEnv(value) {
+  return ['1', 'true', 'yes', 'on'].includes((value ?? '').toLowerCase());
+}
+
 async function getTeamChannels(guild) {
   const team1ChannelId = getTeamChannelId(guild.id, 1);
   const team2ChannelId = getTeamChannelId(guild.id, 2);
@@ -60,17 +69,40 @@ export async function handleSplitTeamInteraction(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
       content: 'Dieser Command kann nur auf einem Server genutzt werden.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
   const requestingMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+  const splitTeamOwnerOnly = isTruthyEnv(process.env.SPLIT_TEAM_OWNER_ONLY);
+  const splitTeamAdminOnly = isTruthyEnv(process.env.SPLIT_TEAM_ADMIN_ONLY);
+  const splitTeamTestMode = isTruthyEnv(process.env.SPLIT_TEAM_TEST_MODE);
+
+  if (splitTeamOwnerOnly && interaction.user.id !== interaction.guild.ownerId) {
+    await interaction.reply({
+      content: 'Dieser Command ist nur für den Server-Owner freigegeben.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (
+    !splitTeamOwnerOnly
+    && splitTeamAdminOnly
+    && !requestingMember?.permissions.has(PermissionFlagsBits.Administrator)
+  ) {
+    await interaction.reply({
+      content: 'Dieser Command ist nur für Administratoren freigegeben.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   if (!requestingMember?.voice?.channel) {
     await interaction.reply({
       content: 'Du musst in einem Voice-Channel sein, um Teams aufzuteilen.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -79,9 +111,28 @@ export async function handleSplitTeamInteraction(interaction) {
   const realUsers = Array.from(requesterChannel.members.values()).filter((member) => !member.user.bot);
 
   if (realUsers.length < 2) {
+    if (splitTeamTestMode && realUsers.length === 1) {
+      const team1 = [realUsers[0]];
+      const team2 = [];
+
+      await interaction.reply({
+        content: [
+          `Testmodus aktiv (${interaction.guild.name}) - es wurden keine Mitglieder verschoben.`,
+          '',
+          'Team 1:',
+          formatTeamList(team1),
+          '',
+          'Team 2:',
+          formatTeamList(team2),
+        ].join('\n'),
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     await interaction.reply({
       content: 'Es müssen mindestens zwei Nutzer im Voice-Channel sein.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -92,7 +143,7 @@ export async function handleSplitTeamInteraction(interaction) {
     await interaction.reply({
       content:
         'Es fehlen Ziel-Channel-IDs. Setze TEAM_1_CHANNEL_ID und TEAM_2_CHANNEL_ID (optional pro Server: TEAM_1_CHANNEL_ID_<GUILD_ID> / TEAM_2_CHANNEL_ID_<GUILD_ID>).',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -101,7 +152,7 @@ export async function handleSplitTeamInteraction(interaction) {
     await interaction.reply({
       content:
         'Die konfigurierten Ziel-Channels sind ungültig. Bitte prüfe TEAM_1_CHANNEL_ID und TEAM_2_CHANNEL_ID.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -111,7 +162,7 @@ export async function handleSplitTeamInteraction(interaction) {
   if (!botMember) {
     await interaction.reply({
       content: 'Bot-Mitglied konnte nicht geladen werden.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -123,7 +174,7 @@ export async function handleSplitTeamInteraction(interaction) {
     await interaction.reply({
       content:
         'Mir fehlen Berechtigungen zum Verschieben von Mitgliedern. Ich brauche mindestens: View Channels, Connect, Move Members.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
