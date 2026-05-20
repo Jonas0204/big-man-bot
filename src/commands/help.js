@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 
 export const helpCommand = new SlashCommandBuilder()
   .setName('help')
@@ -12,6 +12,6 @@ export async function handleHelpInteraction(interaction) {
       '- `/restore-team`: Verschiebt alle Mitglieder aus Team 1 und Team 2 zurück in den Ursprungskanal.',
       '- `/help`: Zeigt diese Übersicht an.',
     ].join('\n'),
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 }
