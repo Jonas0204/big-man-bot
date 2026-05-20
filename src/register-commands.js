@@ -4,7 +4,8 @@ import { splitTeamCommand } from './commands/split-team.js';
 import { helpCommand } from './commands/help.js';
 import {
   configureCommand,
-  resetTeamCommand,
+  resetChannelCommand,
+  resetConfigCommand,
   setTeam1Command,
   setTeam2Command,
   showTeamConfigCommand,
@@ -27,7 +28,8 @@ const commands = [
   setTeam1Command.toJSON(),
   setTeam2Command.toJSON(),
   configureCommand.toJSON(),
-  resetTeamCommand.toJSON(),
+  resetConfigCommand.toJSON(),
+  resetChannelCommand.toJSON(),
   showTeamConfigCommand.toJSON(),
 ];
 
