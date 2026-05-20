@@ -5,11 +5,13 @@ import { handleHelpInteraction, helpCommand } from './commands/help.js';
 import {
   configureCommand,
   handleConfigureInteraction,
-  handleResetTeamInteraction,
+  handleResetChannelInteraction,
+  handleResetConfigInteraction,
   handleSetTeam1Interaction,
   handleSetTeam2Interaction,
   handleShowTeamConfigInteraction,
-  resetTeamCommand,
+  resetChannelCommand,
+  resetConfigCommand,
   setTeam1Command,
   setTeam2Command,
   showTeamConfigCommand,
@@ -61,8 +63,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  if (interaction.commandName === resetTeamCommand.name) {
-    await handleResetTeamInteraction(interaction);
+  if (interaction.commandName === resetConfigCommand.name) {
+    await handleResetConfigInteraction(interaction);
+    return;
+  }
+
+  if (interaction.commandName === resetChannelCommand.name) {
+    await handleResetChannelInteraction(interaction);
     return;
   }
 

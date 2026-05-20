@@ -60,6 +60,9 @@ function normalizeGuildConfig(guildConfig) {
   if (isValidSnowflake(guildConfig.team2ChannelId)) {
     normalized.team2ChannelId = guildConfig.team2ChannelId;
   }
+  if (isValidSnowflake(guildConfig.defaultChannelId)) {
+    normalized.defaultChannelId = guildConfig.defaultChannelId;
+  }
   return normalized;
 }
 
