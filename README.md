@@ -1,14 +1,15 @@
 # big-man-bot
 
-Ein schlanker Discord.js Gateway-Bot mit den Slash-Commands `/split-team`, `/restore-team` und `/help`.
+Ein schlanker Discord.js Gateway-Bot mit serverabhängiger Team-Konfiguration und dem Slash-Command `/split-team`.
 
 ## Funktion
 
-- `/split-team` teilt alle echten Nutzer aus deinem aktuellen Voice-Channel zufällig in zwei Teams auf und verschiebt sie in zwei bestehende Voice-Channels.
-  - Optional kann `/split-team` per Env auf Admins oder den Server-Owner eingeschränkt werden.
-  - Optionaler Testmodus erlaubt eine Vorschau mit nur einem Nutzer (ohne Verschieben, zufällige Zuweisung zu Team 1 oder Team 2).
-- `/restore-team` verschiebt alle Mitglieder aus Team 1 und Team 2 zurück in den Ursprungskanal.
-- `/help` zeigt eine Übersicht aller verfügbaren Bot-Befehle.
+- `/configure` setzt Team 1 und Team 2 für den aktuellen Server.
+- `/set-team1` setzt nur den Team-1-Voice-Channel für den aktuellen Server.
+- `/set-team2` setzt nur den Team-2-Voice-Channel für den aktuellen Server.
+- `/show-team-config` zeigt die gespeicherte Team-Konfiguration des aktuellen Servers.
+- `/reset-team` löscht die Team-Konfiguration des aktuellen Servers.
+- `/split-team` nimmt alle echten Nutzer aus deinem aktuellen Voice-Channel, mischt sie zufällig und verschiebt sie in die konfigurierten Team-Channels.
 
 ## Voraussetzungen
 
@@ -70,14 +71,9 @@ docker compose up -d --build
 - `DISCORD_TOKEN`
 - `APP_ID` oder `CLIENT_ID`
 - `GUILD_ID` (optional für Development-Registrierung)
-- `TEAM_1_CHANNEL_ID` und `TEAM_2_CHANNEL_ID` (globale Fallbacks)
-- `ORIGINAL_CHANNEL_ID` (Zielkanal für `/restore-team`)
-- `SPLIT_TEAM_ADMIN_ONLY` (optional: `true` = nur Admins dürfen `/split-team` nutzen)
-- `SPLIT_TEAM_OWNER_ONLY` (optional: `true` = nur Server-Owner darf `/split-team` nutzen)
-- `SPLIT_TEAM_TEST_MODE` (optional: `true` = `/split-team` funktioniert mit 1 Nutzer als Vorschau ohne Move, zufällige Teamzuweisung)
+- `OWNER_USER_IDS` (optional, kommaseparierte User-IDs mit globalem Zugriff auf Konfigurations-Commands)
 
-Optional pro Server (für Multi-Server-Betrieb):
+## Persistente Team-Konfiguration
 
-- `TEAM_1_CHANNEL_ID_<GUILD_ID>`
-- `TEAM_2_CHANNEL_ID_<GUILD_ID>`
-- `ORIGINAL_CHANNEL_ID_<GUILD_ID>`
+- Team-Channels werden pro Server in `data/team-config.json` gespeichert.
+- Der Bot legt den `data`-Ordner und die Datei automatisch an, falls sie fehlen.

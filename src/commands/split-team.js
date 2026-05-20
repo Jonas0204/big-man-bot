@@ -4,6 +4,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
+import { getGuildTeamConfig } from '../teamConfigStore.js';
 
 export const splitTeamCommand = new SlashCommandBuilder()
   .setName('split-team')
@@ -41,20 +42,18 @@ function validateVoiceChannel(channel) {
   return channel?.type === ChannelType.GuildVoice;
 }
 
-function getTeamChannelId(guildId, teamNumber) {
-  return process.env[`TEAM_${teamNumber}_CHANNEL_ID_${guildId}`] ?? process.env[`TEAM_${teamNumber}_CHANNEL_ID`];
-}
-
-function isTruthyEnv(value) {
-  return ['1', 'true', 'yes', 'on'].includes((value ?? '').toLowerCase());
-}
-
 async function getTeamChannels(guild) {
-  const team1ChannelId = getTeamChannelId(guild.id, 1);
-  const team2ChannelId = getTeamChannelId(guild.id, 2);
+  const teamConfig = await getGuildTeamConfig(guild.id);
+  const team1ChannelId = teamConfig?.team1ChannelId;
+  const team2ChannelId = teamConfig?.team2ChannelId;
 
   if (!team1ChannelId || !team2ChannelId) {
-    return { team1Channel: null, team2Channel: null, hasMissingChannelIds: true };
+    return {
+      team1Channel: null,
+      team2Channel: null,
+      hasMissingChannelConfig: true,
+      hasInvalidConfig: false,
+    };
   }
 
   const [team1Channel, team2Channel] = await Promise.all([
@@ -62,7 +61,14 @@ async function getTeamChannels(guild) {
     guild.channels.fetch(team2ChannelId).catch(() => null),
   ]);
 
-  return { team1Channel, team2Channel, hasMissingChannelIds: false };
+  const hasInvalidConfig = !validateVoiceChannel(team1Channel) || !validateVoiceChannel(team2Channel);
+
+  return {
+    team1Channel,
+    team2Channel,
+    hasMissingChannelConfig: false,
+    hasInvalidConfig,
+  };
 }
 
 export async function handleSplitTeamInteraction(interaction) {
@@ -75,30 +81,6 @@ export async function handleSplitTeamInteraction(interaction) {
   }
 
   const requestingMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  const splitTeamOwnerOnly = isTruthyEnv(process.env.SPLIT_TEAM_OWNER_ONLY);
-  const splitTeamAdminOnly = isTruthyEnv(process.env.SPLIT_TEAM_ADMIN_ONLY);
-  const splitTeamTestMode = isTruthyEnv(process.env.SPLIT_TEAM_TEST_MODE);
-
-  if (splitTeamOwnerOnly && interaction.user.id !== interaction.guild.ownerId) {
-    await interaction.reply({
-      content: 'Dieser Command ist nur für den Server-Owner freigegeben.',
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  if (
-    !splitTeamOwnerOnly
-    && splitTeamAdminOnly
-    && !requestingMember?.permissions.has(PermissionFlagsBits.Administrator)
-  ) {
-    await interaction.reply({
-      content: 'Dieser Command ist nur für Administratoren freigegeben.',
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
   if (!requestingMember?.voice?.channel) {
     await interaction.reply({
       content: 'Du musst in einem Voice-Channel sein, um Teams aufzuteilen.',
@@ -111,26 +93,6 @@ export async function handleSplitTeamInteraction(interaction) {
   const realUsers = Array.from(requesterChannel.members.values()).filter((member) => !member.user.bot);
 
   if (realUsers.length < 2) {
-    if (splitTeamTestMode && realUsers.length === 1) {
-      const assignToTeam1 = Math.random() < 0.5;
-      const team1 = assignToTeam1 ? [realUsers[0]] : [];
-      const team2 = assignToTeam1 ? [] : [realUsers[0]];
-
-      await interaction.reply({
-        content: [
-          `Testmodus aktiv (${interaction.guild.name}) - es wurden keine Mitglieder verschoben.`,
-          '',
-          'Team 1:',
-          formatTeamList(team1),
-          '',
-          'Team 2:',
-          formatTeamList(team2),
-        ].join('\n'),
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
     await interaction.reply({
       content: 'Es müssen mindestens zwei Nutzer im Voice-Channel sein.',
       flags: MessageFlags.Ephemeral,
@@ -138,21 +100,33 @@ export async function handleSplitTeamInteraction(interaction) {
     return;
   }
 
-  const { team1Channel, team2Channel, hasMissingChannelIds } = await getTeamChannels(interaction.guild);
+  const {
+    team1Channel,
+    team2Channel,
+    hasMissingChannelConfig,
+    hasInvalidConfig,
+  } = await getTeamChannels(interaction.guild);
 
-  if (hasMissingChannelIds) {
+  if (hasMissingChannelConfig) {
     await interaction.reply({
-      content:
-        'Es fehlen Ziel-Channel-IDs. Setze TEAM_1_CHANNEL_ID und TEAM_2_CHANNEL_ID (optional pro Server: TEAM_1_CHANNEL_ID_<GUILD_ID> / TEAM_2_CHANNEL_ID_<GUILD_ID>).',
+      content: 'Bitte konfiguriere zuerst Team 1 und Team 2 mit /configure.',
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (!validateVoiceChannel(team1Channel) || !validateVoiceChannel(team2Channel)) {
+  if (hasInvalidConfig) {
     await interaction.reply({
       content:
-        'Die konfigurierten Ziel-Channels sind ungültig. Bitte prüfe TEAM_1_CHANNEL_ID und TEAM_2_CHANNEL_ID.',
+        'Die gespeicherte Team-Konfiguration ist ungültig. Bitte setze Team 1 und Team 2 mit /configure neu.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (team1Channel.id === team2Channel.id) {
+    await interaction.reply({
+      content: 'Team 1 und Team 2 dürfen nicht derselbe Channel sein. Bitte nutze /configure.',
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -210,7 +184,7 @@ export async function handleSplitTeamInteraction(interaction) {
   );
 
   const responseLines = [
-    `Teams wurden zufällig aufgeteilt (${interaction.guild.name}):`,
+    'Teams wurden zufällig aufgeteilt:',
     '',
     'Team 1:',
     formatTeamList(team1),

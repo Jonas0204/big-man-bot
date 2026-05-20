@@ -1,8 +1,13 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
 import { splitTeamCommand } from './commands/split-team.js';
-import { restoreTeamCommand } from './commands/restore-team.js';
-import { helpCommand } from './commands/help.js';
+import {
+  configureCommand,
+  resetTeamCommand,
+  setTeam1Command,
+  setTeam2Command,
+  showTeamConfigCommand,
+} from './commands/team-config.js';
 
 if (!process.env.DISCORD_TOKEN) {
   throw new Error('Fehlende Umgebungsvariable: DISCORD_TOKEN');
@@ -17,8 +22,11 @@ if (!appId) {
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 const commands = [
   splitTeamCommand.toJSON(),
-  restoreTeamCommand.toJSON(),
-  helpCommand.toJSON(),
+  setTeam1Command.toJSON(),
+  setTeam2Command.toJSON(),
+  configureCommand.toJSON(),
+  resetTeamCommand.toJSON(),
+  showTeamConfigCommand.toJSON(),
 ];
 
 async function registerCommands() {
