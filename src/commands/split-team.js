@@ -1,27 +1,8 @@
-import 'dotenv/config';
-import {
-  ChannelType,
-  Client,
-  Events,
-  GatewayIntentBits,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 
-const REQUIRED_ENV_VARS = [
-  'DISCORD_TOKEN',
-  'TEAM_1_CHANNEL_ID',
-  'TEAM_2_CHANNEL_ID',
-];
-
-for (const envVar of REQUIRED_ENV_VARS) {
-  if (!process.env[envVar]) {
-    throw new Error(`Fehlende Umgebungsvariable: ${envVar}`);
-  }
-}
-
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
-});
+export const splitTeamCommand = new SlashCommandBuilder()
+  .setName('split-team')
+  .setDescription('Teilt alle Mitglieder deines aktuellen Voice-Channels zufällig in zwei Teams auf.');
 
 function shuffleMembers(members) {
   const shuffled = [...members];
@@ -33,22 +14,11 @@ function shuffleMembers(members) {
 }
 
 function formatTeamList(members) {
+  if (members.length === 0) {
+    return '- (leer)';
+  }
+
   return members.map((member) => `- ${member.displayName}`).join('\n');
-}
-
-async function getTeamChannels(guild) {
-  const team1Channel = await guild.channels
-    .fetch(process.env.TEAM_1_CHANNEL_ID)
-    .catch(() => null);
-  const team2Channel = await guild.channels
-    .fetch(process.env.TEAM_2_CHANNEL_ID)
-    .catch(() => null);
-
-  return { team1Channel, team2Channel };
-}
-
-function validateVoiceChannel(channel) {
-  return channel?.type === ChannelType.GuildVoice;
 }
 
 function getMissingPermissions(channel, member) {
@@ -62,15 +32,31 @@ function getMissingPermissions(channel, member) {
   return required.filter((permission) => !permissions?.has(permission));
 }
 
-client.once(Events.ClientReady, (readyClient) => {
-  console.log(`Bot ist online als ${readyClient.user.tag}`);
-});
+function validateVoiceChannel(channel) {
+  return channel?.type === ChannelType.GuildVoice;
+}
 
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== 'split-team') {
-    return;
+function getTeamChannelId(guildId, teamNumber) {
+  return process.env[`TEAM_${teamNumber}_CHANNEL_ID_${guildId}`] ?? process.env[`TEAM_${teamNumber}_CHANNEL_ID`];
+}
+
+async function getTeamChannels(guild) {
+  const team1ChannelId = getTeamChannelId(guild.id, 1);
+  const team2ChannelId = getTeamChannelId(guild.id, 2);
+
+  if (!team1ChannelId || !team2ChannelId) {
+    return { team1Channel: null, team2Channel: null, hasMissingChannelIds: true };
   }
 
+  const [team1Channel, team2Channel] = await Promise.all([
+    guild.channels.fetch(team1ChannelId).catch(() => null),
+    guild.channels.fetch(team2ChannelId).catch(() => null),
+  ]);
+
+  return { team1Channel, team2Channel, hasMissingChannelIds: false };
+}
+
+export async function handleSplitTeamInteraction(interaction) {
   if (!interaction.inGuild()) {
     await interaction.reply({
       content: 'Dieser Command kann nur auf einem Server genutzt werden.',
@@ -79,8 +65,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const requesterChannel = interaction.member.voice.channel;
-  if (!requesterChannel) {
+  const requestingMember = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+
+  if (!requestingMember?.voice?.channel) {
     await interaction.reply({
       content: 'Du musst in einem Voice-Channel sein, um Teams aufzuteilen.',
       ephemeral: true,
@@ -88,9 +75,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const realUsers = Array.from(requesterChannel.members.values()).filter(
-    (member) => !member.user.bot,
-  );
+  const requesterChannel = requestingMember.voice.channel;
+  const realUsers = Array.from(requesterChannel.members.values()).filter((member) => !member.user.bot);
 
   if (realUsers.length < 2) {
     await interaction.reply({
@@ -100,7 +86,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  const { team1Channel, team2Channel } = await getTeamChannels(interaction.guild);
+  const { team1Channel, team2Channel, hasMissingChannelIds } = await getTeamChannels(interaction.guild);
+
+  if (hasMissingChannelIds) {
+    await interaction.reply({
+      content:
+        'Es fehlen Ziel-Channel-IDs. Setze TEAM_1_CHANNEL_ID und TEAM_2_CHANNEL_ID (optional pro Server: TEAM_1_CHANNEL_ID_<GUILD_ID> / TEAM_2_CHANNEL_ID_<GUILD_ID>).',
+      ephemeral: true,
+    });
+    return;
+  }
 
   if (!validateVoiceChannel(team1Channel) || !validateVoiceChannel(team2Channel)) {
     await interaction.reply({
@@ -112,6 +107,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   const botMember = interaction.guild.members.me;
+
   if (!botMember) {
     await interaction.reply({
       content: 'Bot-Mitglied konnte nicht geladen werden.',
@@ -162,7 +158,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   );
 
   const responseLines = [
-    'Teams wurden zufällig aufgeteilt:',
+    `Teams wurden zufällig aufgeteilt (${interaction.guild.name}):`,
     '',
     'Team 1:',
     formatTeamList(team1),
@@ -176,6 +172,4 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   await interaction.editReply({ content: responseLines.join('\n') });
-});
-
-client.login(process.env.DISCORD_TOKEN);
+}

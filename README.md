@@ -1,6 +1,6 @@
 # big-man-bot
 
-Ein schlanker Discord-Bot mit dem Slash-Command `/split-team`.
+Ein schlanker Discord.js Gateway-Bot mit dem Slash-Command `/split-team`.
 
 ## Funktion
 
@@ -24,11 +24,14 @@ npm install
 
 2. `.env` aus `.env.example` erstellen und Werte eintragen.
 
-3. Slash-Command als Guild-Command registrieren:
+3. Slash-Command registrieren:
 
 ```bash
 npm run register
 ```
+
+Wenn `GUILD_ID` gesetzt ist, wird als Guild-Command registriert (schnell für Entwicklung).
+Wenn `GUILD_ID` fehlt, wird global registriert (für alle Server der App).
 
 4. Bot starten:
 
@@ -55,7 +58,11 @@ docker run -d --name big-man-bot --env-file .env big-man-bot
 ## Umgebungsvariablen
 
 - `DISCORD_TOKEN`
-- `CLIENT_ID`
-- `GUILD_ID`
-- `TEAM_1_CHANNEL_ID`
-- `TEAM_2_CHANNEL_ID`
+- `APP_ID` oder `CLIENT_ID`
+- `GUILD_ID` (optional für Development-Registrierung)
+- `TEAM_1_CHANNEL_ID` und `TEAM_2_CHANNEL_ID` (globale Fallbacks)
+
+Optional pro Server (für Multi-Server-Betrieb):
+
+- `TEAM_1_CHANNEL_ID_<GUILD_ID>`
+- `TEAM_2_CHANNEL_ID_<GUILD_ID>`
