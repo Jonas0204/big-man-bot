@@ -1,10 +1,12 @@
 # big-man-bot
 
-Ein schlanker Discord.js Gateway-Bot mit dem Slash-Command `/split-team`.
+Ein schlanker Discord.js Gateway-Bot mit den Slash-Commands `/split-team`, `/restore-team` und `/help`.
 
 ## Funktion
 
-`/split-team` teilt alle echten Nutzer aus deinem aktuellen Voice-Channel zufällig in zwei Teams auf und verschiebt sie in zwei bestehende Voice-Channels.
+- `/split-team` teilt alle echten Nutzer aus deinem aktuellen Voice-Channel zufällig in zwei Teams auf und verschiebt sie in zwei bestehende Voice-Channels.
+- `/restore-team` verschiebt alle Mitglieder aus Team 1 und Team 2 zurück in den Ursprungskanal.
+- `/help` zeigt eine Übersicht aller verfügbaren Bot-Befehle.
 
 ## Voraussetzungen
 
@@ -55,14 +57,22 @@ docker build -t big-man-bot .
 docker run -d --name big-man-bot --env-file .env big-man-bot
 ```
 
+Alternativ mit Docker Compose lokal bauen und starten:
+
+```bash
+docker compose up -d --build
+```
+
 ## Umgebungsvariablen
 
 - `DISCORD_TOKEN`
 - `APP_ID` oder `CLIENT_ID`
 - `GUILD_ID` (optional für Development-Registrierung)
 - `TEAM_1_CHANNEL_ID` und `TEAM_2_CHANNEL_ID` (globale Fallbacks)
+- `ORIGINAL_CHANNEL_ID` (Zielkanal für `/restore-team`)
 
 Optional pro Server (für Multi-Server-Betrieb):
 
 - `TEAM_1_CHANNEL_ID_<GUILD_ID>`
 - `TEAM_2_CHANNEL_ID_<GUILD_ID>`
+- `ORIGINAL_CHANNEL_ID_<GUILD_ID>`
