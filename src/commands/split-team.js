@@ -112,8 +112,9 @@ export async function handleSplitTeamInteraction(interaction) {
 
   if (realUsers.length < 2) {
     if (splitTeamTestMode && realUsers.length === 1) {
-      const team1 = [realUsers[0]];
-      const team2 = [];
+      const assignToTeam1 = Math.random() < 0.5;
+      const team1 = assignToTeam1 ? [realUsers[0]] : [];
+      const team2 = assignToTeam1 ? [] : [realUsers[0]];
 
       await interaction.reply({
         content: [
