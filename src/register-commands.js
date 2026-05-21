@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
 import { splitTeamCommand } from './commands/split-team.js';
 import { helpCommand } from './commands/help.js';
+import { sayCommand } from './commands/say.js';
 import {
   configureCommand,
   resetChannelCommand,
@@ -25,6 +26,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 const commands = [
   splitTeamCommand.toJSON(),
   helpCommand.toJSON(),
+  sayCommand.toJSON(),
   setTeam1Command.toJSON(),
   setTeam2Command.toJSON(),
   configureCommand.toJSON(),
