@@ -1,6 +1,5 @@
 import {
   ChannelType,
-  MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
@@ -30,7 +29,6 @@ export async function handleSayInteraction(interaction) {
   if (!channel.isTextBased()) {
     await interaction.reply({
       content: 'Der angegebene Channel ist kein Text-Channel.',
-      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -39,12 +37,10 @@ export async function handleSayInteraction(interaction) {
     await channel.send(message);
     await interaction.reply({
       content: `Nachricht wurde in ${channel} gesendet.`,
-      flags: MessageFlags.Ephemeral,
     });
   } catch {
     await interaction.reply({
       content: `Fehler: Die Nachricht konnte nicht in ${channel} gesendet werden.`,
-      flags: MessageFlags.Ephemeral,
     });
   }
 }
