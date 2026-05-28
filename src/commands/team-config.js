@@ -63,12 +63,6 @@ export const configureCommand = new SlashCommandBuilder()
       .setDescription('Voice-Default-Channel zum Zurückholen')
       .setRequired(true)
       .addChannelTypes(ChannelType.GuildVoice)
-  ))
-  .addBooleanOption((option) => (
-    option
-      .setName('showroles')
-      .setDescription('Zeigt bei /split-team Positions-Tags (Top/Jungle/Mid/sup/adc) an.')
-      .setRequired(false)
   ));
 
 export const resetConfigCommand = new SlashCommandBuilder()
@@ -202,7 +196,6 @@ export async function handleConfigureInteraction(interaction) {
   const team1 = interaction.options.getChannel('team1', true);
   const team2 = interaction.options.getChannel('team2', true);
   const defaultChannel = interaction.options.getChannel('default', true);
-  const showRoleTags = interaction.options.getBoolean('showroles') ?? false;
 
   if (!isVoiceChannel(team1) || !isVoiceChannel(team2) || !isVoiceChannel(defaultChannel)) {
     await interaction.reply({
@@ -224,7 +217,6 @@ export async function handleConfigureInteraction(interaction) {
     team1ChannelId: team1.id,
     team2ChannelId: team2.id,
     defaultChannelId: defaultChannel.id,
-    showRoleTags,
   });
 
   await interaction.reply({
@@ -233,7 +225,6 @@ export async function handleConfigureInteraction(interaction) {
       `Team 1: <#${team1.id}>`,
       `Team 2: <#${team2.id}>`,
       `Default: <#${defaultChannel.id}>`,
-      `Rollenanzeige bei /split-team: ${showRoleTags ? 'aktiviert' : 'deaktiviert'}`,
     ].join('\n'),
     flags: MessageFlags.Ephemeral,
   });
@@ -299,11 +290,6 @@ export async function handleResetChannelInteraction(interaction) {
     return;
   }
 
-  const resetRoleTags = Boolean(config?.showRoleTags);
-  if (resetRoleTags) {
-    await updateGuildTeamConfig(interaction.guildId, { showRoleTags: false });
-  }
-
   const botMember = interaction.guild.members.me;
   if (!botMember) {
     await interaction.reply({
@@ -341,10 +327,7 @@ export async function handleResetChannelInteraction(interaction) {
 
   if (uniqueMembers.length === 0) {
     await interaction.editReply({
-      content: [
-        'In den Team-Channels sind aktuell keine Nutzer zum Zurückholen.',
-        resetRoleTags ? 'Rollenanzeige für /split-team wurde auf deaktiviert zurückgesetzt.' : null,
-      ].filter(Boolean).join('\n'),
+      content: 'In den Team-Channels sind aktuell keine Nutzer zum Zurückholen.',
     });
     return;
   }
@@ -366,9 +349,6 @@ export async function handleResetChannelInteraction(interaction) {
   ];
   if (moveErrors.length > 0) {
     responseLines.push(`Diese Nutzer konnten nicht verschoben werden: ${moveErrors.join(', ')}`);
-  }
-  if (resetRoleTags) {
-    responseLines.push('Rollenanzeige für /split-team wurde auf deaktiviert zurückgesetzt.');
   }
 
   await interaction.editReply({
@@ -397,7 +377,6 @@ export async function handleShowTeamConfigInteraction(interaction) {
       `Team 1: <#${config.team1ChannelId}>`,
       `Team 2: <#${config.team2ChannelId}>`,
       `Default: <#${config.defaultChannelId}>`,
-      `Rollenanzeige bei /split-team: ${config.showRoleTags ? 'aktiviert' : 'deaktiviert'}`,
     ].join('\n'),
     flags: MessageFlags.Ephemeral,
   });

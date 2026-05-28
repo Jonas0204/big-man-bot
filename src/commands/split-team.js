@@ -10,8 +10,6 @@ export const splitTeamCommand = new SlashCommandBuilder()
   .setName('split-team')
   .setDescription('Teilt alle Mitglieder deines aktuellen Voice-Channels zufällig in zwei Teams auf.');
 
-const positionTags = ['Top', 'Jungle', 'Mid', 'sup', 'adc'];
-
 function shuffleMembers(members) {
   const shuffled = [...members];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
@@ -21,18 +19,12 @@ function shuffleMembers(members) {
   return shuffled;
 }
 
-function formatTeamList(members, { withPositionTags = false } = {}) {
+function formatTeamList(members) {
   if (members.length === 0) {
     return '- (leer)';
   }
 
-  return members.map((member, index) => {
-    if (!withPositionTags) {
-      return `- ${member.displayName}`;
-    }
-    const positionTag = positionTags[index];
-    return `- ${member.displayName}${positionTag ? ` (${positionTag})` : ''}`;
-  }).join('\n');
+  return members.map((member) => `- ${member.displayName}`).join('\n');
 }
 
 function getMissingPermissions(channel, member) {
@@ -54,7 +46,6 @@ async function getTeamChannels(guild) {
   const teamConfig = await getGuildTeamConfig(guild.id);
   const team1ChannelId = teamConfig?.team1ChannelId;
   const team2ChannelId = teamConfig?.team2ChannelId;
-  const showRoleTags = Boolean(teamConfig?.showRoleTags);
 
   if (!team1ChannelId || !team2ChannelId) {
     return {
@@ -62,7 +53,6 @@ async function getTeamChannels(guild) {
       team2Channel: null,
       hasMissingChannelConfig: true,
       hasInvalidConfig: false,
-      showRoleTags,
     };
   }
 
@@ -78,7 +68,6 @@ async function getTeamChannels(guild) {
     team2Channel,
     hasMissingChannelConfig: false,
     hasInvalidConfig,
-    showRoleTags,
   };
 }
 
@@ -116,7 +105,6 @@ export async function handleSplitTeamInteraction(interaction) {
     team2Channel,
     hasMissingChannelConfig,
     hasInvalidConfig,
-    showRoleTags,
   } = await getTeamChannels(interaction.guild);
 
   if (hasMissingChannelConfig) {
@@ -199,10 +187,10 @@ export async function handleSplitTeamInteraction(interaction) {
     'Teams wurden zufällig aufgeteilt:',
     '',
     'Team 1:',
-    formatTeamList(team1, { withPositionTags: showRoleTags }),
+    formatTeamList(team1),
     '',
     'Team 2:',
-    formatTeamList(team2, { withPositionTags: showRoleTags }),
+    formatTeamList(team2),
   ];
 
   if (moveErrors.length > 0) {
