@@ -63,6 +63,9 @@ function normalizeGuildConfig(guildConfig) {
   if (isValidSnowflake(guildConfig.defaultChannelId)) {
     normalized.defaultChannelId = guildConfig.defaultChannelId;
   }
+  if (typeof guildConfig.showRoleTags === 'boolean') {
+    normalized.showRoleTags = guildConfig.showRoleTags;
+  }
   return normalized;
 }
 
