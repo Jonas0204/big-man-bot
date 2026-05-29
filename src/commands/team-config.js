@@ -17,6 +17,18 @@ const ownerUserIds = new Set(
     .map((id) => id.trim())
     .filter(Boolean),
 );
+const supportedTeamNumbers = [1, 2, 3, 4, 5, 6];
+const optionalTeamNumbers = supportedTeamNumbers.slice(2);
+
+function addTeamChannelOption(command, teamNumber, required) {
+  return command.addChannelOption((option) => (
+    option
+      .setName(`team${teamNumber}`)
+      .setDescription(`Voice-Channel für Team ${teamNumber}`)
+      .setRequired(required)
+      .addChannelTypes(ChannelType.GuildVoice)
+  ));
+}
 
 export const setTeam1Command = new SlashCommandBuilder()
   .setName('set-team1')
@@ -42,33 +54,31 @@ export const setTeam2Command = new SlashCommandBuilder()
 
 export const configureCommand = new SlashCommandBuilder()
   .setName('configure')
-  .setDescription('Setzt Team 1, Team 2 und den Default-Channel gleichzeitig.')
-  .addChannelOption((option) => (
-    option
-      .setName('team1')
-      .setDescription('Voice-Channel für Team 1')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildVoice)
-  ))
-  .addChannelOption((option) => (
-    option
-      .setName('team2')
-      .setDescription('Voice-Channel für Team 2')
-      .setRequired(true)
-      .addChannelTypes(ChannelType.GuildVoice)
-  ))
+  .setDescription('Setzt Team 1, Team 2, optional Team 3 bis 6 und den Default-Channel gleichzeitig.');
+
+addTeamChannelOption(configureCommand, 1, true);
+addTeamChannelOption(configureCommand, 2, true);
+for (const teamNumber of optionalTeamNumbers) {
+  addTeamChannelOption(configureCommand, teamNumber, false);
+}
+
+configureCommand
   .addChannelOption((option) => (
     option
       .setName('default')
       .setDescription('Voice-Default-Channel zum Zurückholen')
       .setRequired(true)
       .addChannelTypes(ChannelType.GuildVoice)
-  ))
+  ));
+
+export const showRolesCommand = new SlashCommandBuilder()
+  .setName('showroles')
+  .setDescription('Aktiviert oder deaktiviert die Rollenanzeige bei /split-team.')
   .addBooleanOption((option) => (
     option
-      .setName('showroles')
-      .setDescription('Zeigt bei /split-team Positions-Tags (Top/Jungle/Mid/sup/adc) an.')
-      .setRequired(false)
+      .setName('enabled')
+      .setDescription('Ob /split-team die Positions-Tags anzeigen soll')
+      .setRequired(true)
   ));
 
 export const resetConfigCommand = new SlashCommandBuilder()
@@ -77,7 +87,7 @@ export const resetConfigCommand = new SlashCommandBuilder()
 
 export const resetChannelCommand = new SlashCommandBuilder()
   .setName('reset-channel')
-  .setDescription('Holt alle Nutzer aus Team 1 und Team 2 in den Default-Channel zurück.');
+  .setDescription('Holt alle Nutzer aus den konfigurierten Team-Channels in den Default-Channel zurück.');
 
 export const showTeamConfigCommand = new SlashCommandBuilder()
   .setName('show-team-config')
@@ -85,6 +95,23 @@ export const showTeamConfigCommand = new SlashCommandBuilder()
 
 function isVoiceChannel(channel) {
   return channel?.type === ChannelType.GuildVoice;
+}
+
+function getTeamChannelKey(teamNumber) {
+  return `team${teamNumber}ChannelId`;
+}
+
+function getConfiguredTeamChannelIds(config) {
+  return supportedTeamNumbers
+    .map((teamNumber) => ({
+      teamNumber,
+      channelId: config?.[getTeamChannelKey(teamNumber)] ?? null,
+    }))
+    .filter(({ channelId }) => Boolean(channelId));
+}
+
+function formatConfiguredTeamLines(config) {
+  return getConfiguredTeamChannelIds(config).map(({ teamNumber, channelId }) => `Team ${teamNumber}: <#${channelId}>`);
 }
 
 function getMissingPermissions(channel, member) {
@@ -199,42 +226,75 @@ export async function handleConfigureInteraction(interaction) {
     return;
   }
 
-  const team1 = interaction.options.getChannel('team1', true);
-  const team2 = interaction.options.getChannel('team2', true);
   const defaultChannel = interaction.options.getChannel('default', true);
-  const showRoleTags = interaction.options.getBoolean('showroles') ?? false;
+  const selectedTeams = supportedTeamNumbers.map((teamNumber) => ({
+    teamNumber,
+    channel: interaction.options.getChannel(`team${teamNumber}`, teamNumber <= 2),
+  }));
+  const configuredTeams = selectedTeams.filter(({ channel }) => channel);
 
-  if (!isVoiceChannel(team1) || !isVoiceChannel(team2) || !isVoiceChannel(defaultChannel)) {
+  if (
+    !isVoiceChannel(defaultChannel)
+    || configuredTeams.some(({ channel }) => !isVoiceChannel(channel))
+  ) {
     await interaction.reply({
-      content: 'Bitte wähle für Team 1, Team 2 und Default gültige Voice-Channels aus.',
+      content: 'Bitte wähle für Team 1, Team 2, optionale weitere Teams und Default gültige Voice-Channels aus.',
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (new Set([team1.id, team2.id, defaultChannel.id]).size !== 3) {
+  const configuredChannelIds = [
+    ...configuredTeams.map(({ channel }) => channel.id),
+    defaultChannel.id,
+  ];
+
+  if (new Set(configuredChannelIds).size !== configuredChannelIds.length) {
     await interaction.reply({
-      content: 'Team 1, Team 2 und Default müssen unterschiedliche Channels sein.',
+      content: 'Alle konfigurierten Team-Channels und Default müssen unterschiedlich sein.',
       flags: MessageFlags.Ephemeral,
     });
     return;
+  }
+
+  const existingConfig = await getGuildTeamConfig(interaction.guildId);
+  const nextConfig = configuredTeams.reduce((config, { teamNumber, channel }) => ({
+    ...config,
+    [getTeamChannelKey(teamNumber)]: channel.id,
+  }), {
+    defaultChannelId: defaultChannel.id,
+  });
+  if (typeof existingConfig?.showRoleTags === 'boolean') {
+    nextConfig.showRoleTags = existingConfig.showRoleTags;
   }
 
   await setGuildTeamConfig(interaction.guildId, {
-    team1ChannelId: team1.id,
-    team2ChannelId: team2.id,
-    defaultChannelId: defaultChannel.id,
-    showRoleTags,
+    ...nextConfig,
   });
 
   await interaction.reply({
     content: [
       'Team-Konfiguration gespeichert:',
-      `Team 1: <#${team1.id}>`,
-      `Team 2: <#${team2.id}>`,
+      ...configuredTeams.map(({ teamNumber, channel }) => `Team ${teamNumber}: <#${channel.id}>`),
       `Default: <#${defaultChannel.id}>`,
-      `Rollenanzeige bei /split-team: ${showRoleTags ? 'aktiviert' : 'deaktiviert'}`,
     ].join('\n'),
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+export async function handleShowRolesInteraction(interaction) {
+  if (!await ensureGuildInteraction(interaction)) {
+    return;
+  }
+
+  if (!await ensureConfigPermission(interaction)) {
+    return;
+  }
+
+  const enabled = interaction.options.getBoolean('enabled', true);
+  await updateGuildTeamConfig(interaction.guildId, { showRoleTags: enabled });
+  await interaction.reply({
+    content: `Rollenanzeige bei /split-team: ${enabled ? 'aktiviert' : 'deaktiviert'}`,
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -265,11 +325,10 @@ export async function handleResetChannelInteraction(interaction) {
   }
 
   const config = await getGuildTeamConfig(interaction.guildId);
-  const team1ChannelId = config?.team1ChannelId;
-  const team2ChannelId = config?.team2ChannelId;
+  const configuredTeamChannels = getConfiguredTeamChannelIds(config);
   const defaultChannelId = config?.defaultChannelId;
 
-  if (!team1ChannelId || !team2ChannelId || !defaultChannelId) {
+  if (configuredTeamChannels.length < 2 || !defaultChannelId) {
     await interaction.reply({
       content: 'Bitte konfiguriere zuerst Team 1, Team 2 und Default mit /configure.',
       flags: MessageFlags.Ephemeral,
@@ -277,13 +336,16 @@ export async function handleResetChannelInteraction(interaction) {
     return;
   }
 
-  const [team1Channel, team2Channel, defaultChannel] = await Promise.all([
-    interaction.guild.channels.fetch(team1ChannelId).catch(() => null),
-    interaction.guild.channels.fetch(team2ChannelId).catch(() => null),
+  const fetchedChannels = await Promise.all([
+    ...configuredTeamChannels.map(({ channelId }) => (
+      interaction.guild.channels.fetch(channelId).catch(() => null)
+    )),
     interaction.guild.channels.fetch(defaultChannelId).catch(() => null),
   ]);
+  const defaultChannel = fetchedChannels.at(-1);
+  const teamChannels = fetchedChannels.slice(0, -1);
 
-  if (!isVoiceChannel(team1Channel) || !isVoiceChannel(team2Channel) || !isVoiceChannel(defaultChannel)) {
+  if (!isVoiceChannel(defaultChannel) || teamChannels.some((channel) => !isVoiceChannel(channel))) {
     await interaction.reply({
       content: 'Die gespeicherte Konfiguration ist ungültig. Bitte nutze /configure erneut.',
       flags: MessageFlags.Ephemeral,
@@ -291,17 +353,17 @@ export async function handleResetChannelInteraction(interaction) {
     return;
   }
 
-  if (new Set([team1Channel.id, team2Channel.id, defaultChannel.id]).size !== 3) {
+  const configuredChannelIds = [
+    ...teamChannels.map((channel) => channel.id),
+    defaultChannel.id,
+  ];
+
+  if (new Set(configuredChannelIds).size !== configuredChannelIds.length) {
     await interaction.reply({
       content: 'Die gespeicherte Konfiguration ist ungültig. Bitte nutze /configure erneut.',
       flags: MessageFlags.Ephemeral,
     });
     return;
-  }
-
-  const resetRoleTags = Boolean(config?.showRoleTags);
-  if (resetRoleTags) {
-    await updateGuildTeamConfig(interaction.guildId, { showRoleTags: false });
   }
 
   const botMember = interaction.guild.members.me;
@@ -313,14 +375,11 @@ export async function handleResetChannelInteraction(interaction) {
     return;
   }
 
-  const team1MissingPermissions = getMissingPermissions(team1Channel, botMember);
-  const team2MissingPermissions = getMissingPermissions(team2Channel, botMember);
-  const defaultMissingPermissions = getMissingPermissions(defaultChannel, botMember);
-  if (
-    team1MissingPermissions.length > 0
-    || team2MissingPermissions.length > 0
-    || defaultMissingPermissions.length > 0
-  ) {
+  const hasMissingPermissions = [
+    ...teamChannels,
+    defaultChannel,
+  ].some((channel) => getMissingPermissions(channel, botMember).length > 0);
+  if (hasMissingPermissions) {
     await interaction.reply({
       content:
         'Mir fehlen Berechtigungen zum Verschieben von Mitgliedern. Ich brauche mindestens: View Channels, Connect, Move Members.',
@@ -330,10 +389,8 @@ export async function handleResetChannelInteraction(interaction) {
   }
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   const membersInTeamChannels = [
-    ...team1Channel.members.values(),
-    ...team2Channel.members.values(),
+    ...teamChannels.flatMap((channel) => [...channel.members.values()]),
   ].filter((member) => !member.user.bot);
   const uniqueMembers = Array.from(
     new Map(membersInTeamChannels.map((member) => [member.id, member])).values(),
@@ -341,10 +398,7 @@ export async function handleResetChannelInteraction(interaction) {
 
   if (uniqueMembers.length === 0) {
     await interaction.editReply({
-      content: [
-        'In den Team-Channels sind aktuell keine Nutzer zum Zurückholen.',
-        resetRoleTags ? 'Rollenanzeige für /split-team wurde auf deaktiviert zurückgesetzt.' : null,
-      ].filter(Boolean).join('\n'),
+      content: 'In den Team-Channels sind aktuell keine Nutzer zum Zurückholen.',
     });
     return;
   }
@@ -366,9 +420,6 @@ export async function handleResetChannelInteraction(interaction) {
   ];
   if (moveErrors.length > 0) {
     responseLines.push(`Diese Nutzer konnten nicht verschoben werden: ${moveErrors.join(', ')}`);
-  }
-  if (resetRoleTags) {
-    responseLines.push('Rollenanzeige für /split-team wurde auf deaktiviert zurückgesetzt.');
   }
 
   await interaction.editReply({
@@ -394,8 +445,7 @@ export async function handleShowTeamConfigInteraction(interaction) {
   await interaction.reply({
     content: [
       'Aktuelle Team-Konfiguration:',
-      `Team 1: <#${config.team1ChannelId}>`,
-      `Team 2: <#${config.team2ChannelId}>`,
+      ...formatConfiguredTeamLines(config),
       `Default: <#${config.defaultChannelId}>`,
       `Rollenanzeige bei /split-team: ${config.showRoleTags ? 'aktiviert' : 'deaktiviert'}`,
     ].join('\n'),

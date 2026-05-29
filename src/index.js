@@ -1,6 +1,11 @@
 import 'dotenv/config';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import { handleSplitTeamInteraction, splitTeamCommand } from './commands/split-team.js';
+import {
+  handleSplitTeamIn3Interaction,
+  handleSplitTeamInteraction,
+  splitTeamCommand,
+  splitTeamIn3Command,
+} from './commands/split-team.js';
 import { handleHelpInteraction, helpCommand } from './commands/help.js';
 import { handleSayInteraction, sayCommand } from './commands/say.js';
 import {
@@ -10,11 +15,13 @@ import {
   handleResetConfigInteraction,
   handleSetTeam1Interaction,
   handleSetTeam2Interaction,
+  handleShowRolesInteraction,
   handleShowTeamConfigInteraction,
   resetChannelCommand,
   resetConfigCommand,
   setTeam1Command,
   setTeam2Command,
+  showRolesCommand,
   showTeamConfigCommand,
 } from './commands/team-config.js';
 
@@ -44,6 +51,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  if (interaction.commandName === splitTeamIn3Command.name) {
+    await handleSplitTeamIn3Interaction(interaction);
+    return;
+  }
+
   if (interaction.commandName === helpCommand.name) {
     await handleHelpInteraction(interaction);
     return;
@@ -66,6 +78,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   if (interaction.commandName === configureCommand.name) {
     await handleConfigureInteraction(interaction);
+    return;
+  }
+
+  if (interaction.commandName === showRolesCommand.name) {
+    await handleShowRolesInteraction(interaction);
     return;
   }
 

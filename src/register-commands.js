@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
-import { splitTeamCommand } from './commands/split-team.js';
+import { splitTeamCommand, splitTeamIn3Command } from './commands/split-team.js';
 import { helpCommand } from './commands/help.js';
 import { sayCommand } from './commands/say.js';
 import {
@@ -9,6 +9,7 @@ import {
   resetConfigCommand,
   setTeam1Command,
   setTeam2Command,
+  showRolesCommand,
   showTeamConfigCommand,
 } from './commands/team-config.js';
 
@@ -25,11 +26,13 @@ if (!appId) {
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 const commands = [
   splitTeamCommand.toJSON(),
+  splitTeamIn3Command.toJSON(),
   helpCommand.toJSON(),
   sayCommand.toJSON(),
   setTeam1Command.toJSON(),
   setTeam2Command.toJSON(),
   configureCommand.toJSON(),
+  showRolesCommand.toJSON(),
   resetConfigCommand.toJSON(),
   resetChannelCommand.toJSON(),
   showTeamConfigCommand.toJSON(),
