@@ -6,11 +6,20 @@ import {
 } from 'discord.js';
 import { getGuildTeamConfig } from '../teamConfigStore.js';
 
+const supportedTeamNumbers = [1, 2, 3, 4, 5, 6];
+const positionTags = ['Top', 'Jungle', 'Mid', 'sup', 'adc'];
+
 export const splitTeamCommand = new SlashCommandBuilder()
   .setName('split-team')
   .setDescription('Teilt alle Mitglieder deines aktuellen Voice-Channels zufällig in zwei Teams auf.');
 
-const positionTags = ['Top', 'Jungle', 'Mid', 'sup', 'adc'];
+export const splitTeamIn3Command = new SlashCommandBuilder()
+  .setName('split-team-in-3')
+  .setDescription('Verschiebt Nutzer aus dem Default-Channel stapelweise in 3er-Gruppen auf die Team-Channels.');
+
+function getTeamChannelKey(teamNumber) {
+  return `team${teamNumber}ChannelId`;
+}
 
 function shuffleMembers(members) {
   const shuffled = [...members];
@@ -50,36 +59,72 @@ function validateVoiceChannel(channel) {
   return channel?.type === ChannelType.GuildVoice;
 }
 
-async function getTeamChannels(guild) {
+async function getConfiguredChannels(guild) {
   const teamConfig = await getGuildTeamConfig(guild.id);
-  const team1ChannelId = teamConfig?.team1ChannelId;
-  const team2ChannelId = teamConfig?.team2ChannelId;
   const showRoleTags = Boolean(teamConfig?.showRoleTags);
+  const defaultChannelId = teamConfig?.defaultChannelId ?? null;
+  const configuredTeams = supportedTeamNumbers
+    .map((teamNumber) => ({
+      teamNumber,
+      channelId: teamConfig?.[getTeamChannelKey(teamNumber)] ?? null,
+    }))
+    .filter(({ channelId }) => Boolean(channelId));
 
-  if (!team1ChannelId || !team2ChannelId) {
+  if (configuredTeams.length < 2 || !defaultChannelId) {
     return {
-      team1Channel: null,
-      team2Channel: null,
+      teamChannels: [],
+      defaultChannel: null,
       hasMissingChannelConfig: true,
       hasInvalidConfig: false,
       showRoleTags,
     };
   }
 
-  const [team1Channel, team2Channel] = await Promise.all([
-    guild.channels.fetch(team1ChannelId).catch(() => null),
-    guild.channels.fetch(team2ChannelId).catch(() => null),
+  const fetchedChannels = await Promise.all([
+    ...configuredTeams.map(({ channelId }) => guild.channels.fetch(channelId).catch(() => null)),
+    guild.channels.fetch(defaultChannelId).catch(() => null),
   ]);
 
-  const hasInvalidConfig = !validateVoiceChannel(team1Channel) || !validateVoiceChannel(team2Channel);
+  const defaultChannel = fetchedChannels.at(-1);
+  const teamChannels = configuredTeams.map((team, index) => ({
+    ...team,
+    channel: fetchedChannels[index],
+  }));
+  const hasInvalidConfig = (
+    !validateVoiceChannel(defaultChannel)
+    || teamChannels.some(({ channel }) => !validateVoiceChannel(channel))
+    || new Set([
+      ...teamChannels.map(({ channel }) => channel?.id),
+      defaultChannel?.id,
+    ].filter(Boolean)).size !== teamChannels.length + 1
+  );
 
   return {
-    team1Channel,
-    team2Channel,
+    teamChannels,
+    defaultChannel,
     hasMissingChannelConfig: false,
     hasInvalidConfig,
     showRoleTags,
   };
+}
+
+function createTripleAssignments(members, teamChannels) {
+  const assignments = [];
+  let startIndex = 0;
+
+  for (let index = 0; index < teamChannels.length && startIndex < members.length; index += 1) {
+    const remainingMembers = members.length - startIndex;
+    const remainingChannels = teamChannels.length - index;
+    const takeCount = remainingChannels === 1 || remainingMembers <= 3 ? remainingMembers : 3;
+
+    assignments.push({
+      ...teamChannels[index],
+      members: members.slice(startIndex, startIndex + takeCount),
+    });
+    startIndex += takeCount;
+  }
+
+  return assignments;
 }
 
 export async function handleSplitTeamInteraction(interaction) {
@@ -112,16 +157,15 @@ export async function handleSplitTeamInteraction(interaction) {
   }
 
   const {
-    team1Channel,
-    team2Channel,
+    teamChannels,
     hasMissingChannelConfig,
     hasInvalidConfig,
     showRoleTags,
-  } = await getTeamChannels(interaction.guild);
+  } = await getConfiguredChannels(interaction.guild);
 
   if (hasMissingChannelConfig) {
     await interaction.reply({
-      content: 'Bitte konfiguriere zuerst Team 1 und Team 2 mit /configure.',
+      content: 'Bitte konfiguriere zuerst Team 1, Team 2 und Default mit /configure.',
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -130,20 +174,13 @@ export async function handleSplitTeamInteraction(interaction) {
   if (hasInvalidConfig) {
     await interaction.reply({
       content:
-        'Die gespeicherte Team-Konfiguration ist ungültig. Bitte setze Team 1 und Team 2 mit /configure neu.',
+        'Die gespeicherte Team-Konfiguration ist ungültig. Bitte setze Team 1, Team 2 und Default mit /configure neu.',
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  if (team1Channel.id === team2Channel.id) {
-    await interaction.reply({
-      content: 'Team 1 und Team 2 dürfen nicht derselbe Channel sein. Bitte nutze /configure.',
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
+  const [team1, team2] = teamChannels;
   const botMember = interaction.guild.members.me;
 
   if (!botMember) {
@@ -154,10 +191,10 @@ export async function handleSplitTeamInteraction(interaction) {
     return;
   }
 
-  const team1MissingPermissions = getMissingPermissions(team1Channel, botMember);
-  const team2MissingPermissions = getMissingPermissions(team2Channel, botMember);
-
-  if (team1MissingPermissions.length > 0 || team2MissingPermissions.length > 0) {
+  if (
+    getMissingPermissions(team1.channel, botMember).length > 0
+    || getMissingPermissions(team2.channel, botMember).length > 0
+  ) {
     await interaction.reply({
       content:
         'Mir fehlen Berechtigungen zum Verschieben von Mitgliedern. Ich brauche mindestens: View Channels, Connect, Move Members.',
@@ -170,15 +207,14 @@ export async function handleSplitTeamInteraction(interaction) {
 
   const shuffledUsers = shuffleMembers(realUsers);
   const splitIndex = Math.ceil(shuffledUsers.length / 2);
-  const team1 = shuffledUsers.slice(0, splitIndex);
-  const team2 = shuffledUsers.slice(splitIndex);
-
+  const team1Members = shuffledUsers.slice(0, splitIndex);
+  const team2Members = shuffledUsers.slice(splitIndex);
   const moveErrors = [];
 
   await Promise.all(
-    team1.map(async (member) => {
+    team1Members.map(async (member) => {
       try {
-        await member.voice.setChannel(team1Channel, 'Teams mit /split-team aufgeteilt');
+        await member.voice.setChannel(team1.channel, 'Teams mit /split-team aufgeteilt');
       } catch {
         moveErrors.push(member.displayName);
       }
@@ -186,9 +222,9 @@ export async function handleSplitTeamInteraction(interaction) {
   );
 
   await Promise.all(
-    team2.map(async (member) => {
+    team2Members.map(async (member) => {
       try {
-        await member.voice.setChannel(team2Channel, 'Teams mit /split-team aufgeteilt');
+        await member.voice.setChannel(team2.channel, 'Teams mit /split-team aufgeteilt');
       } catch {
         moveErrors.push(member.displayName);
       }
@@ -199,11 +235,106 @@ export async function handleSplitTeamInteraction(interaction) {
     'Teams wurden zufällig aufgeteilt:',
     '',
     'Team 1:',
-    formatTeamList(team1, { withPositionTags: showRoleTags }),
+    formatTeamList(team1Members, { withPositionTags: showRoleTags }),
     '',
     'Team 2:',
-    formatTeamList(team2, { withPositionTags: showRoleTags }),
+    formatTeamList(team2Members, { withPositionTags: showRoleTags }),
   ];
+
+  if (moveErrors.length > 0) {
+    responseLines.push('', `Diese Nutzer konnten nicht verschoben werden: ${moveErrors.join(', ')}`);
+  }
+
+  await interaction.editReply({ content: responseLines.join('\n') });
+}
+
+export async function handleSplitTeamIn3Interaction(interaction) {
+  if (!interaction.inGuild()) {
+    await interaction.reply({
+      content: 'Dieser Command kann nur auf einem Server genutzt werden.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const {
+    teamChannels,
+    defaultChannel,
+    hasMissingChannelConfig,
+    hasInvalidConfig,
+  } = await getConfiguredChannels(interaction.guild);
+
+  if (hasMissingChannelConfig) {
+    await interaction.reply({
+      content: 'Bitte konfiguriere zuerst Team 1, Team 2 und Default mit /configure.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (hasInvalidConfig) {
+    await interaction.reply({
+      content:
+        'Die gespeicherte Team-Konfiguration ist ungültig. Bitte setze Team 1, Team 2 und Default mit /configure neu.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const botMember = interaction.guild.members.me;
+  if (!botMember) {
+    await interaction.reply({
+      content: 'Bot-Mitglied konnte nicht geladen werden.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const hasMissingPermissions = [
+    ...teamChannels.map(({ channel }) => channel),
+    defaultChannel,
+  ].some((channel) => getMissingPermissions(channel, botMember).length > 0);
+  if (hasMissingPermissions) {
+    await interaction.reply({
+      content:
+        'Mir fehlen Berechtigungen zum Verschieben von Mitgliedern. Ich brauche mindestens: View Channels, Connect, Move Members.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const realUsers = Array.from(defaultChannel.members.values()).filter((member) => !member.user.bot);
+  if (realUsers.length === 0) {
+    await interaction.reply({
+      content: 'Im Default-Channel sind aktuell keine Nutzer zum Aufteilen.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  const assignments = createTripleAssignments(realUsers, teamChannels);
+  const moveErrors = [];
+
+  await Promise.all(
+    assignments.flatMap(({ channel, members }) => members.map(async (member) => {
+      try {
+        await member.voice.setChannel(channel, 'Teams mit /split-team-in-3 aufgeteilt');
+      } catch {
+        moveErrors.push(member.displayName);
+      }
+    })),
+  );
+
+  const responseLines = ['Teams wurden stapelweise aufgeteilt:'];
+  for (const assignment of assignments) {
+    responseLines.push(
+      '',
+      `Team ${assignment.teamNumber}:`,
+      formatTeamList(assignment.members),
+    );
+  }
 
   if (moveErrors.length > 0) {
     responseLines.push('', `Diese Nutzer konnten nicht verschoben werden: ${moveErrors.join(', ')}`);

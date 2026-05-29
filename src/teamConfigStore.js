@@ -54,11 +54,11 @@ function normalizeGuildConfig(guildConfig) {
   }
 
   const normalized = {};
-  if (isValidSnowflake(guildConfig.team1ChannelId)) {
-    normalized.team1ChannelId = guildConfig.team1ChannelId;
-  }
-  if (isValidSnowflake(guildConfig.team2ChannelId)) {
-    normalized.team2ChannelId = guildConfig.team2ChannelId;
+  for (let teamNumber = 1; teamNumber <= 6; teamNumber += 1) {
+    const channelKey = `team${teamNumber}ChannelId`;
+    if (isValidSnowflake(guildConfig[channelKey])) {
+      normalized[channelKey] = guildConfig[channelKey];
+    }
   }
   if (isValidSnowflake(guildConfig.defaultChannelId)) {
     normalized.defaultChannelId = guildConfig.defaultChannelId;

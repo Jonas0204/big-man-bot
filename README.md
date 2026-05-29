@@ -5,13 +5,15 @@ Ein schlanker Discord.js Gateway-Bot mit serverabhängiger Team-Konfiguration un
 ## Funktion
 
 - `/help` zeigt eine Übersicht aller verfügbaren Befehle.
-- `/configure` setzt Team 1, Team 2 und den Default-Channel für den aktuellen Server und kann optional die Positions-Tags bei `/split-team` aktivieren.
+- `/configure` setzt Team 1, Team 2, optional Team 3 bis Team 6 und den Default-Channel für den aktuellen Server.
+- `/showroles` aktiviert oder deaktiviert die Positions-Tags bei `/split-team`.
 - `/set-team1` setzt nur den Team-1-Voice-Channel für den aktuellen Server.
 - `/set-team2` setzt nur den Team-2-Voice-Channel für den aktuellen Server.
 - `/show-team-config` zeigt die gespeicherte Team-Konfiguration des aktuellen Servers.
 - `/reset-config` löscht die Team-Konfiguration des aktuellen Servers.
-- `/reset-channel` holt alle Nutzer aus Team 1 und Team 2 in den konfigurierten Default-Channel zurück und setzt die Positions-Tags für `/split-team` wieder auf deaktiviert.
+- `/reset-channel` holt alle Nutzer aus den konfigurierten Team-Channels in den Default-Channel zurück.
 - `/split-team` nimmt alle echten Nutzer aus deinem aktuellen Voice-Channel, mischt sie zufällig und verschiebt sie in die konfigurierten Team-Channels (optional mit `(Top)`, `(Jungle)`, `(Mid)`, `(sup)`, `(adc)` pro Team-Liste).
+- `/split-team-in-3` nimmt alle echten Nutzer aus dem Default-Channel und verschiebt sie stapelweise in 3er-Gruppen auf die konfigurierten Team-Channels; der Rest landet gesammelt im nächsten freien Team.
 
 ## Voraussetzungen
 
