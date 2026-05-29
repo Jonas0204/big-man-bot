@@ -58,9 +58,6 @@ export const configureCommand = new SlashCommandBuilder()
 
 addTeamChannelOption(configureCommand, 1, true);
 addTeamChannelOption(configureCommand, 2, true);
-for (const teamNumber of optionalTeamNumbers) {
-  addTeamChannelOption(configureCommand, teamNumber, false);
-}
 
 configureCommand
   .addChannelOption((option) => (
@@ -70,6 +67,10 @@ configureCommand
       .setRequired(true)
       .addChannelTypes(ChannelType.GuildVoice)
   ));
+
+for (const teamNumber of optionalTeamNumbers) {
+  addTeamChannelOption(configureCommand, teamNumber, false);
+}
 
 export const showRolesCommand = new SlashCommandBuilder()
   .setName('showroles')
